@@ -1,0 +1,103 @@
+"""
+
+gatk PreprocessIntervals
+
+NEEDED DATA:
+    - Human genome fasta (example: GRCh38.fa)
+    - .bed exome panel bed file (example: exome_regions_hg38.bed)
+
+NEEDED SOFTWARE:
+    gatk4: https://gatk.broadinstitute.org/hc/en-us
+
+DESCRIPTION:
+
+    From gatk4 documentation:
+
+    "Prepares bins for coverage collection.
+    
+    The input intervals are first checked for overlapping intervals, which are merged. The resulting intervals are then padded. The padded intervals are then split into bins. Finally, bins that contain only Ns are filtered out."
+
+
+
+    from: https://gatk.broadinstitute.org/hc/en-us/articles/360035531152--How-to-Call-common-and-rare-germline-copy-number-variants
+
+    For targeted exomes, provide the exome capture kit's target intervals with -L, set --bin-length 0 to disable binning and pad the intervals with --padding 250 or other desired length.
+
+
+
+EXAMPLE COMMAND:
+    scons -f gatk_preprocessintervals.scons INTERVALS_PATH=/home/user/annotations_hg38/exome_regions_hg38.bed FASTA_GENOME_PATH=/home/user/annotations_hg38/GRCh38.fa   DEBUG=T
+
+
+SITE:
+    https://gatk.broadinstitute.org/hc/en-us/articles/360042914391-PreprocessIntervals
+
+CITATION:
+    The Genome Analysis Toolkit: a MapReduce framework for analyzing next-generation DNA sequencing data McKenna A, Hanna M, Banks E, Sivachenko A, Cibulskis K, Kernytsky A, Garimella K, Altshuler D, Gabriel S, Daly M, DePristo MA, 2010 GENOME RESEARCH 20:1297-303
+
+"""
+
+
+
+Import('*')
+
+import os
+import sys
+import os.path
+
+class bcolors:
+    OKGREEN = '\033[92m'
+    ERROR   = '\033[91m'
+    ENDC    = '\033[0m'
+
+
+try:
+    env = env
+except NameError as error:
+    print(bcolors.ERROR + str(error) + bcolors.ENDC)
+    print(bcolors.OKGREEN + "Lets go with the DEFAULT variables" + bcolors.ENDC)
+
+    vars = Variables()
+    vars.Add("INTERVALS_PATH", "One or more genomic intervals over which to operate", "./intervals.bed")
+    vars.Add("OUTPUT_DIR", "Directory for output (default: ./)", "./")
+    vars.Add("OUTPUT_NAME", "Output name (default: preprocessed_intervals.interval_list )", "preprocessed_intervals.interval_list")
+    vars.Add("FASTA_GENOME_PATH", "Path to genome fasta file (default: /home/ale/annotations_hg38/exome_regions_hg38.bed)", "/home/ale/annotations_hg39/GRCh38.fa")
+    vars.Add("DEBUG", "Show pipeline error messages", "F")
+
+    env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
+    Decider('timestamp-newer')    
+
+    INTERVALS_PATH    = env["INTERVALS_PATH"]
+    OUTPUT_DIR        = env["OUTPUT_DIR"]
+    OUTPUT_NAME       = env["OUTPUT_NAME"]
+    FASTA_GENOME_PATH = env["FASTA_GENOME_PATH"]
+    DEBUG             = env["DEBUG"]
+
+
+
+    try: 
+        os.makedirs(OUTPUT_DIR)
+    except OSError:
+        if not os.path.exists(OUTPUT_DIR):
+            sys.exit(bcolors.ERROR + "Error creating directory OUTPUT_DIR: {}. Check permissions".format(OUTPUT_DIR) + bcolors.ENDC + "\n")
+
+
+    if os.path.isfile(INTERVALS_PATH) == False:
+        sys.exit(bcolors.ERROR + "File {} do not exists".format(INTERVALS_PATH) + bcolors.ENDC + "\n")
+
+    if os.path.isfile(FASTA_GENOME_PATH) == False:
+        sys.exit(bcolors.ERROR + "File for FASTA_GENOME_PATH  {} do not exists".format(FASTA_GENOME_PATH) + bcolors.ENDC + "\n")
+
+
+    
+    Help(vars.GenerateHelpText(env))
+
+
+TARGET = os.path.join(OUTPUT_DIR, OUTPUT_NAME)
+
+gatk_preprocessintervalsCMD = "gatk PreprocessIntervals --padding 250 -L {} -R {} --bin-length 0 --interval-merging-rule OVERLAPPING_ONLY ".format(INTERVALS_PATH, FASTA_GENOME_PATH) + "-O ${TARGET}"
+
+if DEBUG == "F":
+    gatk_preprocessintervalsCMD += " 2> /dev/null "
+
+env.Command(TARGET, INTERVALS_PATH, gatk_preprocessintervalsCMD)
