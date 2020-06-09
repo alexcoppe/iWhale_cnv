@@ -1,0 +1,109 @@
+Import('*')
+
+import os
+import sys
+import os.path
+from os import listdir
+from os.path import isfile, join
+
+
+class bcolors:
+    OKGREEN = '\033[92m'
+    ERROR   = '\033[91m'
+    ENDC    = '\033[0m'
+
+
+def checkTumorControlMatches(txt):
+    tumor_control_samples = []
+    if os.path.exists(txt):
+        with open(txt,'r') as f:
+            for line in f:
+                tumorSample = line.strip().split(" ")[0]
+                controlSample = line.strip().split(" ")[1]
+                is_there_tumor_bam = os.path.exists(os.path.join("00_bams", tumorSample))
+                is_there_control_bam = os.path.exists(os.path.join("00_bams", controlSample))
+                if is_there_tumor_bam == False:
+                    exit(bcolors.ERROR + "File {} not found in 00_bams directory".format(tumorSample) + bcolors.ENDC)
+                if is_there_control_bam == False:
+                    exit(bcolors.ERROR + "File {} not found in 00_bams directory".format(controlSample) + bcolors.ENDC)
+                tumor_control_samples.append((tumorSample,controlSample))
+    else:
+        return "Error: {} file not found".format(txt)
+
+    return tumor_control_samples
+
+try:
+    env = env
+except NameError as error:
+    print(bcolors.ERROR + str(error) + bcolors.ENDC)
+    print(bcolors.OKGREEN + "Lets go with the DEFAULT variables" + bcolors.ENDC)
+
+    vars = Variables()
+    vars.Add("CPUS", "Number of CPUs to use", '1')
+    vars.Add("DEBUG", "Show pipeline error messages", "F")
+    vars.Add("INTERVALS_PATH", "One or more genomic intervals over which to operate", "./intervals.bed")
+    vars.Add("ANNOTATION_DIR_PATH", "The path for the directory containing all the annotation files needed (default: /annotations)", "/annotations")
+    vars.Add("BED_FILE", "The name of the bed file (default: exome_regions_hg38.bed)", "exome_regions_hg38.bed")
+    vars.Add("FASTA_GENOME", "Name of genome fasta file (default: GRCh38.fa)", "GRCh38.fa")
+
+    env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
+    Decider('timestamp-newer')    
+
+    CPUS                         = env["CPUS"]
+    DEBUG                        = env["DEBUG"]
+    ANNOTATION_DIR_PATH          = env["ANNOTATION_DIR_PATH"]
+    BED_FILE                     = env["BED_FILE"]
+    FASTA_GENOME                 = env["FASTA_GENOME"]
+
+    try:
+        CPUS = int(CPUS)
+    except:
+        sys.exit(bcolors.ERROR + "Error: CPUS ({}) is not right. Shoud be an int".format(CPUS) + bcolors.ENDC + "\n")
+
+    
+    bams_dir = "00_bams"
+    all_files = [f for f in os.listdir(bams_dir) if os.path.isfile(os.path.join(bams_dir, f))]
+    bam_files = [f for f in all_files if f.endswith(".bam")]
+    if len(bam_files) == 0:
+        sys.exit(bcolors.ERROR + "No .bam file in {} directory".format(vcf_dir) + bcolors.ENDC + "\n")
+
+    bam_pairs =  checkTumorControlMatches("tumor_control_samples.txt")
+
+
+    ######################## DO THE JOB ######################
+
+    for bam_tumor,bam_control in bam_pairs:
+        ######## Preparing a genomic intervals list #######
+
+        print(bcolors.OKGREEN + "01 - Preparing intervals list" + bcolors.ENDC)
+
+        try:
+            os.makedirs("01_interval_list")
+        except OSError:
+            if not os.path.exists("01_interval_list"):
+                sys.exit(bcolors.ERROR + "Error creating directory 01_interval_list. Check permissions" + bcolors.ENDC + "\n")
+
+        input_bam_tumor,input_bam_control = ("00_bams/" + bam_tumor, "00_bams/" + bam_control)
+
+        tumor_output_name = bam_control.split(".")[0]
+        control_output_name = bam_control.split(".")[1]
+
+        tumor_target = "tumor_"+ tumor_output_name +  ".interval_list"
+        control_target = "control" + control_output_name + ".interval_list"
+
+        cmd = "scons -j {}  -f gatk_preprocessintervals.scons OUTPUT_DIR=01_interval_list OUTPUT_NAME={} ANNOTATION_DIR_PATH={} FASTA_GENOME={} BED_FILE={}"
+
+        tumor_cmd = cmd.format(CPUS, tumor_target, ANNOTATION_DIR_PATH, FASTA_GENOME, BED_FILE)
+
+        control_cmd = cmd.format(CPUS, control_target, ANNOTATION_DIR_PATH, FASTA_GENOME, BED_FILE)
+
+        if DEBUG == "F":
+            tumor_cmd += " 2> /dev/null "
+            control_cmd += " 2> /dev/null"
+
+        sources = [os.path.join(ANNOTATION_DIR_PATH, FASTA_GENOME)]
+
+        env.Command("01_interval_list/" + tumor_target, sources, tumor_cmd)
+
+        env.Command("01_interval_list/" + control_target, sources, control_cmd)
+
