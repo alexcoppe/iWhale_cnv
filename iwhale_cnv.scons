@@ -13,6 +13,13 @@ class bcolors:
     ENDC    = '\033[0m'
 
 
+def build_samtools_mpileup_file_name(tumor, control):
+    splitted_tumor = ".".join(tumor.split(".")[:-1])
+    splitted_control = ".".join(control.split(".")[:-1])
+    name = splitted_tumor + "_" + splitted_control
+    return name
+
+
 def checkTumorControlMatches(txt):
     tumor_control_samples = []
     if os.path.exists(txt):
@@ -45,6 +52,9 @@ except NameError as error:
     vars.Add("ANNOTATION_DIR_PATH", "The path for the directory containing all the annotation files needed (default: /annotations)", "/annotations")
     vars.Add("BED_FILE", "The name of the bed file (default: exome_regions_hg38.bed)", "exome_regions_hg38.bed")
     vars.Add("FASTA_GENOME", "Name of genome fasta file (default: GRCh38.fa)", "GRCh38.fa")
+    vars.Add("GENOME_FILE_PATH", "The path of the genome fasta (default: ~/annotations_hg38/GRCh38.fa)", "~/annotations_hg38/GRCh38.fa")
+    vars.Add("NORMAL_BAM_PATH", "The path to the normal BAM path (default: ./00_bams/c.bam)", "00_bams/c.bam")
+    vars.Add("TUMOR_BAM_PATH", "The path to the tumor BAM path (default: ./00_bams/t.bam)", "00_bams/t.bam")
 
     env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
     Decider('timestamp-newer')    
@@ -54,11 +64,15 @@ except NameError as error:
     ANNOTATION_DIR_PATH          = env["ANNOTATION_DIR_PATH"]
     BED_FILE                     = env["BED_FILE"]
     FASTA_GENOME                 = env["FASTA_GENOME"]
+    GENOME_FILE_PATH             = env["GENOME_FILE_PATH"]
+    NORMAL_BAM_PATH              = env["NORMAL_BAM_PATH"]
+    TUMOR_BAM_PATH               = env["TUMOR_BAM_PATH"]
 
     try:
         CPUS = int(CPUS)
     except:
         sys.exit(bcolors.ERROR + "Error: CPUS ({}) is not right. Shoud be an int".format(CPUS) + bcolors.ENDC + "\n")
+    CPUS = str(CPUS)
 
     
     bams_dir = "00_bams"
@@ -72,10 +86,10 @@ except NameError as error:
 
     ######################## DO THE JOB ######################
 
-    for bam_tumor,bam_control in bam_pairs:
+    for (bam_tumor,bam_control) in bam_pairs:
         ######## Preparing a genomic intervals list #######
 
-        print(bcolors.OKGREEN + "01 - Preparing intervals list" + bcolors.ENDC)
+        #print(bcolors.OKGREEN + "01 - Preparing intervals list" + bcolors.ENDC)
 
         try:
             os.makedirs("01_interval_list")
@@ -106,4 +120,26 @@ except NameError as error:
         env.Command("01_interval_list/" + tumor_target, sources, tumor_cmd)
 
         env.Command("01_interval_list/" + control_target, sources, control_cmd)
+
+
+        ######## Preparing a genomic intervals list #######
+
+
+        ####### Samtools mpileup ##########################
+
+
+        #print(bcolors.OKGREEN + "03 - Samtools mpileup for VarScan2" + bcolors.ENDC)
+
+        try:
+            os.makedirs("03_samtools_mpileup")
+        except OSError:
+            if not os.path.exists("03_samtools_mpileup"):
+                sys.exit(bcolors.ERROR + "Error creating directory 03_samtools_mpileup. Check permissions" + bcolors.ENDC + "\n")
+
+        samtools_mpileup_file_name = build_samtools_mpileup_file_name(bam_tumor, bam_control)
+        samtools_mpileup_file_name = samtools_mpileup_file_name + ".mpileup"
+
+        mpileupCMD = "scons -f samtools_mpileup.scons OUTPUT_DIR=03_samtools_mpileup GENOME_FILE_PATH=${SOURCES[0]} TUMOR_BAM_PATH=${SOURCES[1]} NORMAL_BAM_PATH=${SOURCES[1]} " +  "OUTPUT_NAME={}".format(samtools_mpileup_file_name)
+
+        env.Command(["./03_samtools_mpileup/" + samtools_mpileup_file_name], [GENOME_FILE_PATH, TUMOR_BAM_PATH, NORMAL_BAM_PATH], mpileupCMD )
 
