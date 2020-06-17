@@ -86,8 +86,19 @@ except NameError as error:
     if not os.path.exists(NORMAL_BAM_PATH):
             sys.exit(bcolors.ERROR + "File associated to NORMAL_BAM_PATH, {}, do not exists".format(NORMAL_BAM_PATH) + bcolors.ENDC + "\n")
 
-    # Example:
-    # samtools_mpileupCMD = "samtools mpileup -q 1 -f ~/annotations_hg38/GRCh38.fa 00_bams/normal.bam 00_bams/tumor.bam > 00_bams/normal_tumor.mpileup"
-    samtools_mpileupCMD = "samtools mpileup -q 1 -f ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]} > ${TARGET}"
 
-    TARGET = os.path.join(OUTPUT_DIR, OUTPUT_NAME)
+
+Help(vars.GenerateHelpText(env))
+
+TARGET = os.path.join(OUTPUT_DIR, OUTPUT_NAME)
+
+# Example:
+# samtools_mpileupCMD = "samtools mpileup -q 1 -f ~/annotations_hg38/GRCh38.fa 00_bams/normal.bam 00_bams/tumor.bam > 00_bams/normal_tumor.mpileup"
+
+samtools_mpileupCMD = "samtools mpileup -q 1 -f ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]} > ${TARGET}"
+
+if DEBUG == "F":
+    samtools_mpileupCMD += " 2> /dev/null "
+
+env.Command(TARGET, [GENOME_FILE_PATH, TUMOR_BAM_PATH, NORMAL_BAM_PATH], samtools_mpileupCMD)
+
