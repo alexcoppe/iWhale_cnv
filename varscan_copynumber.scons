@@ -1,0 +1,61 @@
+Import('*')
+
+import os
+import sys
+import os.path
+
+class bcolors:
+    OKGREEN = '\033[92m'
+    ERROR   = '\033[91m'
+    ENDC    = '\033[0m'
+
+
+print(bcolors.OKGREEN + "Lets go with Varscan2 copynumber" + bcolors.ENDC)
+
+vars = Variables()
+
+vars.Add("VARSCAN_PATH", "The path to VarSca2 jar, default=None", False)
+vars.Add("MPILEUP_PATH", "The path to the .mpielup file (default: ~/tumor_normal.mpileup)", "~/tumor_normal.mpileup")
+vars.Add("MIN_BASE_QUALITY", "Minimum base quality to count for coverage (default: 20)", "20")
+vars.Add("MIN_MAP_QUALITY", "Minimum read mapping quality to count for coverage (default: 20)", "20")
+vars.Add("MIN_COVERAGE", "Minimum coverage threshold for copynumber segments (default: 20)", "20")
+vars.Add("DEBUG", "Show pipeline error messages (default: F)", "F")
+
+env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
+Decider('timestamp-newer')    
+
+VARSCAN_PATH             = env["VARSCAN_PATH"]
+MPILEUP_PATH             = env["MPILEUP_PATH"]
+MIN_BASE_QUALITY         = env["MIN_BASE_QUALITY"]
+MIN_MAP_QUALITY          = env["MIN_MAP_QUALITY"]
+MIN_COVERAGE             = env["MIN_COVERAGE"]
+DEBUG                    = env["DEBUG"]
+
+
+
+if os.path.isfile(VARSCAN_PATH) == False:
+    sys.exit(bcolors.ERROR + "Path to VarSca2 {} is not right".format(VARSCAN_PATH) + bcolors.ENDC + "\n")
+
+if os.path.isfile(MPILEUP_PATH) == False:
+    sys.exit(bcolors.ERROR + "File associated to MPILEUP_PATH variable, {}, do not exists".format(MPILEUP_PATH) + bcolors.ENDC + "\n")
+
+try:
+    is_min_base_quality_an_int = MIN_BASE_QUALITY
+    int(is_min_base_quality_an_int)
+except:
+    sys.exit(bcolors.ERROR + "Error: MIN_BASE_QUALITY ({}) is not right. Shoud be an int".format(MIN_BASE_QUALITY) + bcolors.ENDC + "\n")
+
+try:
+    is_min_map_quality_an_int = MIN_MAP_QUALITY
+    int(is_min_map_quality_an_int)
+except:
+    sys.exit(bcolors.ERROR + "Error: MIN_MAP_QUALITY ({}) is not right. Shoud be an int".format(MIN_MAP_QUALITY) + bcolors.ENDC + "\n")
+
+Help(vars.GenerateHelpText(env))
+
+varscan_copynumberCMD = "java -jar ${SOURCES[0]} copynumber ${SOURCES[1]} Shit --mpileup 2 " + "--min-base-qual {} --min_map-qual {} --min-coverage {}".format(MIN_BASE_QUALITY, MIN_MAP_QUALITY, MIN_COVERAGE)
+
+if DEBUG == "F":
+    varscan_copynumberCMD += " 2> /dev/null "
+
+env.Command("Shit.copynumber", [VARSCAN_PATH, MPILEUP_PATH], varscan_copynumberCMD)
