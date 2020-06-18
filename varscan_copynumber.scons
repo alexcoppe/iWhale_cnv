@@ -19,6 +19,11 @@ vars.Add("MPILEUP_PATH", "The path to the .mpielup file (default: ~/tumor_normal
 vars.Add("MIN_BASE_QUALITY", "Minimum base quality to count for coverage (default: 20)", "20")
 vars.Add("MIN_MAP_QUALITY", "Minimum read mapping quality to count for coverage (default: 20)", "20")
 vars.Add("MIN_COVERAGE", "Minimum coverage threshold for copynumber segments (default: 20)", "20")
+vars.Add("MIN_SEGMENT_SIZE", "Minimum number of consecutive bases to report a segment (default: 10)", "10")
+vars.Add("MAX_SEGMENT_SIZE", "Max size before a new segment is made (default: 100)", "100")
+vars.Add("P_VALUE", "P-value threshold for significant copynumber change-point (default: 0.01)", "0.01")
+vars.Add("DATA_RATIO", "The normal/tumor input data ratio for copynumber adjustment (default: 1.0)", "1.0")
+vars.Add("OUTPUT_FILE_NAME", "The name of the output file", "")
 vars.Add("DEBUG", "Show pipeline error messages (default: F)", "F")
 
 env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
@@ -29,6 +34,11 @@ MPILEUP_PATH             = env["MPILEUP_PATH"]
 MIN_BASE_QUALITY         = env["MIN_BASE_QUALITY"]
 MIN_MAP_QUALITY          = env["MIN_MAP_QUALITY"]
 MIN_COVERAGE             = env["MIN_COVERAGE"]
+MIN_SEGMENT_SIZE         = env["MIN_SEGMENT_SIZE"]
+P_VALUE                  = env["P_VALUE"]
+MAX_SEGMENT_SIZE         = env["MAX_SEGMENT_SIZE"]
+DATA_RATIO               = env["DATA_RATIO"]
+OUTPUT_FILE_NAME         = env["OUTPUT_FILE_NAME"]
 DEBUG                    = env["DEBUG"]
 
 
@@ -51,11 +61,37 @@ try:
 except:
     sys.exit(bcolors.ERROR + "Error: MIN_MAP_QUALITY ({}) is not right. Shoud be an int".format(MIN_MAP_QUALITY) + bcolors.ENDC + "\n")
 
+try:
+    min_segment_size = MIN_SEGMENT_SIZE
+    int(min_segment_size)
+except:
+    sys.exit(bcolors.ERROR + "Error: MIN_SEGMENT_SIZE ({}) is not right. Shoud be an int".format(MIN_SEGMENT_SIZE) + bcolors.ENDC + "\n")
+
+try:
+    max_segement_size = MAX_SEGMENT_SIZE
+    int(max_segement_size)
+except:
+    sys.exit(bcolors.ERROR + "Error: MAX_SEGMENT_SIZE ({}) is not right. Shoud be an int".format(MAX_SEGMENT_SIZE) + bcolors.ENDC + "\n")
+
+try:
+    p_value = P_VALUE
+    float(p_value)
+except:
+    sys.exit(bcolors.ERROR + "Error: P_VALUE ({}) is not right. Shoud be an float".format(P_VALUE) + bcolors.ENDC + "\n")
+
+try:
+    data_ratio = DATA_RATIO
+    float(data_ratio)
+except:
+    sys.exit(bcolors.ERROR + "Error: DATA_RATIO ({}) is not right. Shoud be an float".format(DATA_RATIO) + bcolors.ENDC + "\n")
+
 Help(vars.GenerateHelpText(env))
 
-varscan_copynumberCMD = "java -jar ${SOURCES[0]} copynumber ${SOURCES[1]} Shit --mpileup 2 " + "--min-base-qual {} --min_map-qual {} --min-coverage {}".format(MIN_BASE_QUALITY, MIN_MAP_QUALITY, MIN_COVERAGE)
+varscan_copynumberCMD = "java -jar ${SOURCES[0]} copynumber ${SOURCES[1]} " + " {} --mpileup 2 --min-base-qual {} --min_map-qual {} --min-coverage {} --min-segment-size {} --max-segment-size {} --p-value {} --data-ratio {}".format(OUTPUT_FILE_NAME, MIN_BASE_QUALITY, MIN_MAP_QUALITY, MIN_COVERAGE, MIN_SEGMENT_SIZE, MAX_SEGMENT_SIZE, P_VALUE, DATA_RATIO)
 
 if DEBUG == "F":
     varscan_copynumberCMD += " 2> /dev/null "
 
-env.Command("Shit.copynumber", [VARSCAN_PATH, MPILEUP_PATH], varscan_copynumberCMD)
+OUTPUT_FILE_NAME = OUTPUT_FILE_NAME + ".copynumber"
+
+env.Command(OUTPUT_FILE_NAME, [VARSCAN_PATH, MPILEUP_PATH], varscan_copynumberCMD)
