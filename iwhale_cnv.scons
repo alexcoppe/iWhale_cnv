@@ -55,6 +55,15 @@ except NameError as error:
     vars.Add("GENOME_FILE_PATH", "The path of the genome fasta (default: ~/annotations_hg38/GRCh38.fa)", "~/annotations_hg38/GRCh38.fa")
     vars.Add("NORMAL_BAM_PATH", "The path to the normal BAM path (default: ./00_bams/c.bam)", "00_bams/c.bam")
     vars.Add("TUMOR_BAM_PATH", "The path to the tumor BAM path (default: ./00_bams/t.bam)", "00_bams/t.bam")
+    vars.Add("VARSCAN_PATH", "The path to VarSca2 jar, default=None", False)
+    vars.Add("VARSCAN_PATH", "The path to VarSca2 jar, default=None", False)
+    vars.Add("MIN_BASE_QUALITY", "Minimum base quality to count for coverage (default: 20)", "20")
+    vars.Add("MIN_MAP_QUALITY", "Minimum read mapping quality to count for coverage (default: 20)", "20")
+    vars.Add("MIN_COVERAGE", "Minimum coverage threshold for copynumber segments (default: 20)", "20")
+    vars.Add("MIN_SEGMENT_SIZE", "Minimum number of consecutive bases to report a segment (default: 10)", "10")
+    vars.Add("MAX_SEGMENT_SIZE", "Max size before a new segment is made (default: 100)", "100")
+    vars.Add("P_VALUE", "P-value threshold for significant copynumber change-point (default: 0.01)", "0.01")
+    vars.Add("DATA_RATIO", "The normal/tumor input data ratio for copynumber adjustment (default: 1.0)", "1.0")
 
     env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
     Decider('timestamp-newer')    
@@ -67,6 +76,14 @@ except NameError as error:
     GENOME_FILE_PATH             = env["GENOME_FILE_PATH"]
     NORMAL_BAM_PATH              = env["NORMAL_BAM_PATH"]
     TUMOR_BAM_PATH               = env["TUMOR_BAM_PATH"]
+    VARSCAN_PATH                 = env["VARSCAN_PATH"]
+    MIN_BASE_QUALITY             = env["MIN_BASE_QUALITY"]
+    MIN_MAP_QUALITY              = env["MIN_MAP_QUALITY"]
+    MIN_COVERAGE                 = env["MIN_COVERAGE"]
+    MIN_SEGMENT_SIZE             = env["MIN_SEGMENT_SIZE"]
+    MAX_SEGMENT_SIZE             = env["MAX_SEGMENT_SIZE"]
+    P_VALUE                      = env["P_VALUE"]
+    DATA_RATIO                   = env["DATA_RATIO"]
 
     try:
         CPUS = int(CPUS)
@@ -143,3 +160,19 @@ except NameError as error:
 
         env.Command(["./03_samtools_mpileup/" + samtools_mpileup_file_name], [GENOME_FILE_PATH, TUMOR_BAM_PATH, NORMAL_BAM_PATH], mpileupCMD )
 
+
+        ####### VarScan2 copynumber ##########################
+
+        try:
+            os.makedirs("04_varscan_copynumber")
+        except OSError:
+            if not os.path.exists("04_varscan_copynumber"):
+                sys.exit(bcolors.ERROR + "Error creating directory 04_varscan_copynumber. Check permissions" + bcolors.ENDC + "\n")
+
+        varscan_copynumber_output = "04_varscan_copynumber/" +  samtools_mpileup_file_name.split(".")[0]
+
+        varscan_copynumberCMD = "scons -f varscan_copynumber.scons VARSCAN_PATH=${SOURCES[0]} " + " MPILEUP_PATH=03_samtools_mpileup/{} MIN_BASE_QUALITY={} OUTPUT_FILE_NAME={} MIN_MAP_QUALITY={} MIN_COVERAGE={} MIN_SEGMENT_SIZE={} MAX_SEGMENT_SIZE={} P_VALUE={} DATA_RATIO={} ".format(samtools_mpileup_file_name, MIN_BASE_QUALITY, varscan_copynumber_output, MIN_MAP_QUALITY, MIN_COVERAGE, MIN_SEGMENT_SIZE, MAX_SEGMENT_SIZE, P_VALUE, DATA_RATIO)
+
+        TARGET = varscan_copynumber_output + ".copynumber"
+
+        env.Command([TARGET], [VARSCAN_PATH], varscan_copynumberCMD )
