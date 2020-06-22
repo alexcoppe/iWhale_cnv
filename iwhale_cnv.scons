@@ -175,4 +175,4 @@ except NameError as error:
 
         TARGET = varscan_copynumber_output + ".copynumber"
 
-        env.Command([TARGET], [VARSCAN_PATH], varscan_copynumberCMD )
+        env.Command([TARGET], [VARSCAN_PATH, "./03_samtools_mpileup/" + samtools_mpileup_file_name], varscan_copynumberCMD )
