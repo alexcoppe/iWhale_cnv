@@ -1,0 +1,75 @@
+'''
+scons -f varscan_copycaller.scons VARSCAN_PATH=~/ll2.copynumber MIN_COVERAGE=31 AMP_THRESHOLD=0.3 DEL_THRESHOLD=0.3 MIN_REGION_SIZE=20 OUTPUT_HOMDEL_FILE_PATH=./04_varscan_copynumber/ricaduta_normal2.homdel OUTPUT_FILE_PATH=./04_varscan_copynumber/ricaduta_normal2.copynumber.called
+'''
+
+
+Import('*')
+
+import os
+import sys
+import os.path
+
+class bcolors:
+    OKGREEN = '\033[92m'
+    ERROR   = '\033[91m'
+    ENDC    = '\033[0m'
+
+
+print(bcolors.OKGREEN + "Lets go with Varscan2 copynumber" + bcolors.ENDC)
+
+vars = Variables()
+
+vars.Add("VARSCAN_PATH", "The path to VarSca2 jar, default=None", False)
+vars.Add("COPY_NUMBER_PATH", "Process VarScan copynumber output to adjust for GC and make preliminary calls (default: none) ", "False")
+vars.Add("OUTPUT_FILE_PATH", "The path and name of the output file (default: ./varScan.copynumber.called)", "./varScan.copynumber.called")
+vars.Add("MIN_COVERAGE", "Minimum coverage threshold for copynumber segments (default: 20)", "20")
+vars.Add("AMP_THRESHOLD", "Lower bound for log ratio to call amplification (default: 0.25)", "0.25")
+vars.Add("DEL_THRESHOLD", "Upper bound for log ratio to call deletion (provide as positive number) (default: 0.25)", "0.25")
+vars.Add("MIN_REGION_SIZE", "Minimum size (in bases) for a region to be counted (default: 10)", "10")
+vars.Add("OUTPUT_HOMDEL_FILE_PATH", "Optional output file for candidate homozygous deletions (default: ./varscan_copynumber.called.homdel)", "None")
+
+env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
+Decider('timestamp-newer')    
+
+COPY_NUMBER_PATH          = env["COPY_NUMBER_PATH"]
+VARSCAN_PATH              = env["VARSCAN_PATH"]
+OUTPUT_FILE_PATH          = env["OUTPUT_FILE_PATH"]
+MIN_COVERAGE              = env["MIN_COVERAGE"]
+AMP_THRESHOLD             = env["AMP_THRESHOLD"]
+DEL_THRESHOLD             = env["DEL_THRESHOLD"]
+MIN_REGION_SIZE           = env["MIN_REGION_SIZE"]
+OUTPUT_HOMDEL_FILE_PATH   = env["OUTPUT_HOMDEL_FILE_PATH"]
+
+if os.path.isfile(COPY_NUMBER_PATH) == False:
+    sys.exit(bcolors.ERROR + "Path to VarSca2 copyCaller  {} is not right".format(COPY_NUMBER_PATH) + bcolors.ENDC + "\n")
+
+try:
+    min_coverage = MIN_COVERAGE
+    int(min_coverage)
+except:
+    sys.exit(bcolors.ERROR + "Error: MIN_COVERAGE ({}) is not right. Shoud be an int".format(MIN_COVERAGE) + bcolors.ENDC + "\n")
+
+try:
+    amp_threshold = AMP_THRESHOLD
+    float(amp_threshold)
+except:
+    sys.exit(bcolors.ERROR + "Error: AMP_THRESHOLD ({}) is not right. Shoud be an float".format(AMP_THRESHOLD) + bcolors.ENDC + "\n")
+
+try:
+    del_threshold = DEL_THRESHOLD
+    float(del_threshold)
+except:
+    sys.exit(bcolors.ERROR + "Error: DEL_THRESHOLD ({}) is not right. Shoud be a positive float".format(AMP_THRESHOLD) + bcolors.ENDC + "\n")
+
+try:
+    min_region_size = MIN_REGION_SIZE
+    int(min_region_size)
+except:
+    sys.exit(bcolors.ERROR + "Error: MIN_REGION_SIZE ({}) is not right. Shoud be a positive int".format(MIN_REGION_SIZE) + bcolors.ENDC + "\n")
+
+
+Help(vars.GenerateHelpText(env))
+
+varscan_copycallerCMD = "java -jar ${SOURCES[0]} copyCaller ${SOURCES[1]} --output-file ${TARGETS[0]} --output-homdel-file ${TARGETS[1]}" + " --min-coverage {} --amp-threshold {} --del-threshold {} --min-region-size {}".format(MIN_COVERAGE, AMP_THRESHOLD, DEL_THRESHOLD, MIN_REGION_SIZE)
+
+varscan_copycaller = env.Command([OUTPUT_FILE_PATH, OUTPUT_HOMDEL_FILE_PATH, OUTPUT_FILE_PATH + ".gc"], [VARSCAN_PATH, COPY_NUMBER_PATH], varscan_copycallerCMD)
