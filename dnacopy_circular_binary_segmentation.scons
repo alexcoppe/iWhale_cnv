@@ -1,0 +1,43 @@
+'''
+scons -j 10 -f dnacopy_circular_binary_segmentation.scons COPY_CALLER_OUTPUT_PATH=~/iwhale_cnv/tmp/05_varscan_copycaller/relaps_normal.copynumber.called OUTPUT_FROM_DNA_COPY=./segmented_and_classified.copynumber.called DEBUG=T
+'''
+
+Import('*')
+
+import os
+import sys
+import os.path
+
+class bcolors:
+    OKGREEN = '\033[92m'
+    ERROR   = '\033[91m'
+    ENDC    = '\033[0m'
+
+
+print(bcolors.OKGREEN + "Lets go with Varscan2 copynumber" + bcolors.ENDC)
+
+vars = Variables()
+
+vars.Add("COPY_CALLER_OUTPUT_PATH", "The path to the VarScan copyCaller output", False)
+vars.Add("OUTPUT_FROM_DNA_COPY", "The path and name of the output file", False)
+vars.Add("DEBUG", "Show pipeline error messages (default: F)", "F")
+
+env = Environment(ENV = os.environ, SHELL = '/bin/bash', variables = vars)
+Decider('timestamp-newer')    
+
+COPY_CALLER_OUTPUT_PATH   = env["COPY_CALLER_OUTPUT_PATH"]
+OUTPUT_FROM_DNA_COPY      = env["OUTPUT_FROM_DNA_COPY"]
+DEBUG                     = env["DEBUG"]
+
+
+Help(vars.GenerateHelpText(env))
+
+if os.path.isfile(COPY_CALLER_OUTPUT_PATH) == False:
+    sys.exit(bcolors.ERROR + "File associated to COPY_CALLER_OUTPUT_PATH variable, {}, do not exists".format(COPY_CALLER_OUTPUT_PATH) + bcolors.ENDC + "\n")
+
+dnacopyCMD = "Rscript --vanilla {}".format("./segmentation_and_classification.R") + " ${SOURCES} ${TARGET}"
+
+if DEBUG == "F":
+    dnacopyCMD += " 2> /dev/null "
+
+env.Command([OUTPUT_FROM_DNA_COPY], [COPY_CALLER_OUTPUT_PATH], dnacopyCMD)
