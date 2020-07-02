@@ -202,3 +202,18 @@ except NameError as error:
         varscan_copycallerCMD = "scons -f varscan_copycaller.scons VARSCAN_PATH=${SOURCES[0]}" + " COPY_NUMBER_PATH={}.copynumber OUTPUT_HOMDEL_FILE_PATH={} OUTPUT_FILE_PATH={} MIN_COVERAGE={} AMP_THRESHOLD={} DEL_THRESHOLD={} MIN_REGION_SIZE={}".format(varscan_copynumber_output, TARGET3, TARGET1, VARSCAN_COPYCALLER_MIN_COVERAGE, AMP_THRESHOLD, DEL_THRESHOLD, MIN_REGION_SIZE)
 
         env.Command([TARGET1, TARGET2, TARGET3], [VARSCAN_PATH], varscan_copycallerCMD)
+
+        ####### Circular Binary Segmentation ##########################
+
+        try:
+            os.makedirs("06_circular_binary_segmentation")
+        except OSError:
+            if not os.path.exists("06_circular_binary_segmentation"):
+                sys.exit(bcolors.ERROR + "Error creating directory 06_circular_binary_segmentation. Check permissions" + bcolors.ENDC + "\n")
+
+        circular_binary_segmentation_out = "06_circular_binary_segmentation/" + samtools_mpileup_file_name.split(".")[0] + ".segmented"
+        print(circular_binary_segmentation_out)
+
+        circular_binary_segmentation_outCMD = "scons -j {} -f ".format(CPUS) + " dnacopy_circular_binary_segmentation.scons COPY_CALLER_OUTPUT_PATH=${SOURCES} OUTPUT_FROM_DNA_COPY=${TARGET}"
+
+        env.Command([circular_binary_segmentation_out], [TARGET1], circular_binary_segmentation_outCMD)
